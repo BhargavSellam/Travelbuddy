@@ -140,6 +140,33 @@ const WHY_CARDS = [
   { icon: "📅", title: "Weekend Special Packages", desc: "Perfect Friday-to-Sunday getaways designed around your work schedule." },
 ];
 
+const TRIP_OPTIONS = [
+  "4 July, Sat – Cotswolds Village Escape (£49)",
+  "5 July, Sun – Brighton Pier & Seven Sisters (£49)",
+  "11 July, Sat – Isle of Wight Adventure (£65)",
+  "12 July, Sun – Puzzlewood & Gloucester Cathedral (£49)",
+  "17–19 July – Cornwall Weekend Escape (£265)",
+  "25 July, Sat – Durdle Door & Lulworth Cove (£55)",
+  "26 July, Sun – Lavender Farm & Strawberry Picking (Girls Trip) (£49)",
+];
+
+const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/FORM_ID/formResponse";
+const GOOGLE_FORM_ENTRY_IDS = {
+  travellerType: "entry.YOUR_TRAVELLER_TYPE_ID",
+  trip: "entry.YOUR_TRIP_ID",
+  name: "entry.YOUR_NAME_ID",
+  email: "entry.YOUR_EMAIL_ID",
+  dob: "entry.YOUR_DOB_ID",
+  gender: "entry.YOUR_GENDER_ID",
+  whatsapp: "entry.YOUR_WHATSAPP_ID",
+  foodPreference: "entry.YOUR_FOOD_ID",
+  allergies: "entry.YOUR_ALLERGIES_ID",
+  instagram: "entry.YOUR_INSTAGRAM_ID",
+  paymentScreenshot: "entry.YOUR_PAYMENT_ID",
+  consent: "entry.YOUR_CONSENT_ID",
+  waiver: "entry.YOUR_WAIVER_ID",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function useFadeIn(threshold = 0.12) {
@@ -230,6 +257,334 @@ function StatCounter({ target, label, suffix = "+" }: { target: number; label: s
   );
 }
 
+function BookingPage({ onBackHome }: { onBackHome: () => void }) {
+  const [bookingForm, setBookingForm] = useState({
+    travellerType: "",
+    trip: TRIP_OPTIONS[0],
+    fullName: "",
+    email: "",
+    dob: "",
+    gender: "",
+    whatsapp: "",
+    foodPreference: "",
+    allergies: "",
+    instagram: "",
+    paymentScreenshot: null as File | null,
+  });
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [waiverAccepted, setWaiverAccepted] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [statusType, setStatusType] = useState<"info" | "success" | "error" | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const updateField = (field: keyof typeof bookingForm, value: string | File | null) => {
+    setBookingForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const isValidEmail = (email: string) => {
+    const v = String(email || "").trim();
+    // stricter but practical email validation: user@domain.tld (TLD 2+ chars)
+    return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(v);
+  };
+
+  const isValidWhatsApp = (phone: string) => {
+    const v = String(phone || "").trim();
+    if (!v) return false;
+    // require international format starting with + and 9-15 digits total
+    // allow spaces, dashes, parentheses which will be stripped
+    const cleaned = v.replace(/[^0-9+]/g, "");
+    if (!cleaned.startsWith("+")) return false;
+    const digits = cleaned.replace(/\D/g, "");
+    return digits.length >= 9 && digits.length <= 15;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatusMessage("Submitting...");
+    setStatusType("info");
+
+    if (!bookingForm.travellerType || !bookingForm.trip || !bookingForm.fullName || !bookingForm.email || !bookingForm.dob || !bookingForm.gender || !bookingForm.whatsapp || !bookingForm.foodPreference || !bookingForm.paymentScreenshot || !consentAccepted || !waiverAccepted) {
+      setStatusMessage("Please complete all required fields, attach a payment screenshot, and agree to both declarations before submitting.");
+      setStatusType("error");
+      return;
+    }
+
+    // validate email and whatsapp
+    if (!isValidEmail(bookingForm.email)) {
+      setStatusMessage("Invalid mail id");
+      setStatusType("error");
+      return;
+    }
+
+    if (!isValidWhatsApp(bookingForm.whatsapp)) {
+      setStatusMessage("Invalid number");
+      setStatusType("error");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const params = new URLSearchParams();
+      params.append(GOOGLE_FORM_ENTRY_IDS.travellerType, bookingForm.travellerType);
+      params.append(GOOGLE_FORM_ENTRY_IDS.trip, bookingForm.trip);
+      params.append(GOOGLE_FORM_ENTRY_IDS.name, bookingForm.fullName);
+      params.append(GOOGLE_FORM_ENTRY_IDS.email, bookingForm.email);
+      params.append(GOOGLE_FORM_ENTRY_IDS.dob, bookingForm.dob);
+      params.append(GOOGLE_FORM_ENTRY_IDS.gender, bookingForm.gender);
+      params.append(GOOGLE_FORM_ENTRY_IDS.whatsapp, bookingForm.whatsapp);
+      params.append(GOOGLE_FORM_ENTRY_IDS.foodPreference, bookingForm.foodPreference);
+      params.append(GOOGLE_FORM_ENTRY_IDS.allergies, bookingForm.allergies || "None");
+      params.append(GOOGLE_FORM_ENTRY_IDS.instagram, bookingForm.instagram || "Not provided");
+      params.append(GOOGLE_FORM_ENTRY_IDS.paymentScreenshot, bookingForm.paymentScreenshot?.name || "No file attached");
+      params.append(GOOGLE_FORM_ENTRY_IDS.consent, consentAccepted ? "Yes" : "No");
+      params.append(GOOGLE_FORM_ENTRY_IDS.waiver, waiverAccepted ? "Yes" : "No");
+
+      await fetch(GOOGLE_FORM_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: params.toString(),
+      });
+
+      setStatusMessage("Your booking request has been submitted. The travel team will contact you.");
+      setStatusType("success");
+      setBookingForm({
+        travellerType: "",
+        trip: TRIP_OPTIONS[0],
+        fullName: "",
+        email: "",
+        dob: "",
+        gender: "",
+        whatsapp: "",
+        foodPreference: "",
+        allergies: "",
+        instagram: "",
+        paymentScreenshot: null,
+      });
+      setConsentAccepted(false);
+      setWaiverAccepted(false);
+    } catch {
+      setStatusMessage("Submission could not be completed. Please check the Google Form link in the app code and update it if needed.");
+      setStatusType("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f4f7fb] text-[#0a1f3c]">
+      <div className="max-w-6xl mx-auto px-6 py-8 md:py-12">
+        <button
+          onClick={onBackHome}
+          className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#0a1f3c]/10 bg-white px-4 py-2 text-sm font-semibold text-[#0a1f3c] shadow-sm transition hover:bg-orange-50"
+        >
+          ← Back to Home
+        </button>
+
+        <div className="overflow-hidden rounded-[32px] bg-white shadow-2xl shadow-[#0a1f3c]/10">
+          <div className="bg-[#0a1f3c] px-8 py-10 text-white md:px-10">
+            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-400">Booking Request</div>
+            <h1 className="mt-3 text-3xl font-black sm:text-4xl">Reserve Your Next Adventure</h1>
+            <p className="mt-3 max-w-2xl text-sm text-white/70 sm:text-base">
+              Share your details here and your request will be sent to travel team to review.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="grid gap-6 p-8 md:grid-cols-2 md:p-10">
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Type of Traveller</label>
+              <select
+                value={bookingForm.travellerType}
+                onChange={(e) => updateField("travellerType", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none ring-0 focus:border-orange-400"
+                required
+              >
+                <option value="">Select one</option>
+                <option value="Solo">Solo</option>
+                <option value="Group of Friends">Group of Friends</option>
+                <option value="Family">Family</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Choose Your Trip</label>
+              <select
+                value={bookingForm.trip}
+                onChange={(e) => updateField("trip", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none ring-0 focus:border-orange-400"
+                required
+              >
+                {TRIP_OPTIONS.map((trip) => (
+                  <option key={trip} value={trip}>{trip}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Full Name</label>
+              <input
+                type="text"
+                value={bookingForm.fullName}
+                onChange={(e) => updateField("fullName", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Email ID</label>
+              <input
+                type="email"
+                value={bookingForm.email}
+                onChange={(e) => updateField("email", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Date of Birth</label>
+              <input
+                type="date"
+                value={bookingForm.dob}
+                onChange={(e) => updateField("dob", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Gender</label>
+              <select
+                value={bookingForm.gender}
+                onChange={(e) => updateField("gender", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                required
+              >
+                <option value="">Select one</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Non-binary">Non-binary</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">WhatsApp Contact</label>
+              <input
+                type="tel"
+                value={bookingForm.whatsapp}
+                onChange={(e) => updateField("whatsapp", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Food Preference</label>
+              <input
+                type="text"
+                value={bookingForm.foodPreference}
+                onChange={(e) => updateField("foodPreference", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                placeholder="Vegetarian / Vegan / Non-vegetarian"
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Any allergies? Please mention (optional)</label>
+              <textarea
+                rows={3}
+                value={bookingForm.allergies}
+                onChange={(e) => updateField("allergies", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                placeholder="Optional"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Instagram Handle (optional)</label>
+              <input
+                type="text"
+                value={bookingForm.instagram}
+                onChange={(e) => updateField("instagram", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-orange-400"
+                placeholder="@yourhandle"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#0a1f3c]">Payment Screenshot</label>
+              <input
+                type="file"
+                accept="image/*"
+                required
+                onChange={(e) => updateField("paymentScreenshot", e.target.files?.[0] || null)}
+                className="w-full rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm outline-none focus:border-orange-400"
+              />
+              <p className="mt-2 text-xs text-gray-500">Please rename the file with your name before uploading.</p>
+              {bookingForm.paymentScreenshot ? (
+                <div className="mt-2 text-sm text-gray-700">Uploaded: {bookingForm.paymentScreenshot.name}</div>
+              ) : null}
+            </div>
+
+            <div className="md:col-span-2 space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                <p className="font-semibold text-[#0a1f3c]">Participant Consent Form</p>
+                <p className="mt-2 leading-6">
+                  By booking a trip with London Sundara Travels Ltd., I agree to the following: I’m happy to receive updates via email or WhatsApp, I have read the trip details, I understand the itinerary may change, I will follow organiser guidance, I take responsibility for my belongings, and I understand all bookings are final and non-refundable.
+                </p>
+                <label className="mt-3 flex items-start gap-2 text-sm text-[#0a1f3c]">
+                  <input type="checkbox" checked={consentAccepted} onChange={(e) => setConsentAccepted(e.target.checked)} className="mt-1" />
+                  <span>I understood &amp; agree to the above.</span>
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                <p className="font-semibold text-[#0a1f3c]">Trip Safety &amp; Responsibility Agreement</p>
+                <p className="mt-2 leading-6">
+                  By booking and joining a trip, I confirm that I am participating voluntarily, I understand the travel may involve risks, I acknowledge that third-party providers may support the trip, and I agree that London Sundara Travels Ltd. and its partners are not liable for injury, loss, delay or accident except where required by law.
+                </p>
+                <label className="mt-3 flex items-start gap-2 text-sm text-[#0a1f3c]">
+                  <input type="checkbox" checked={waiverAccepted} onChange={(e) => setWaiverAccepted(e.target.checked)} className="mt-1" />
+                  <span>I confirm that I have read and accepted this waiver.</span>
+                </label>
+              </div>
+            </div>
+
+            {statusMessage ? (
+              <div
+                className={`md:col-span-2 rounded-xl border px-4 py-3 text-sm ${
+                  statusType === "success"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : statusType === "error"
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-orange-200 bg-orange-50 text-orange-700"
+                }`}
+              >
+                {statusMessage}
+              </div>
+            ) : null}
+
+            <div className="md:col-span-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-full bg-orange-500 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Booking Request"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -237,6 +592,10 @@ export default function App() {
   const [scrolled, setScrolled] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
+  const [isBookingPage, setIsBookingPage] = useState(() => {
+    const hash = window.location.hash.toLowerCase();
+    return hash === "#/booking" || hash === "#booking";
+  });
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 50);
@@ -244,11 +603,42 @@ export default function App() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
+  useEffect(() => {
+    const syncBookingPage = () => {
+      const hash = window.location.hash.toLowerCase();
+      setIsBookingPage(hash === "#/booking" || hash === "#booking");
+    };
+
+    window.addEventListener("hashchange", syncBookingPage);
+    return () => window.removeEventListener("hashchange", syncBookingPage);
+  }, []);
+
+  const openBookingPage = () => {
+    window.location.hash = "#/booking";
+    setIsBookingPage(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goHome = () => {
+    window.location.hash = "";
+    setIsBookingPage(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const scrollTo = (href: string) => {
     setNavOpen(false);
+    if (href === "#booking") {
+      openBookingPage();
+      return;
+    }
+
     const el = document.querySelector(href);
     if (el) el.scrollIntoView({ behavior: "smooth" });
   };
+
+  if (isBookingPage) {
+    return <BookingPage onBackHome={goHome} />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden" style={{ fontFamily: "Inter, sans-serif" }}>
@@ -303,7 +693,7 @@ export default function App() {
               </button>
             ))}
             <button
-              onClick={() => scrollTo("#contact")}
+              onClick={() => openBookingPage()}
               className="ml-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold transition-all hover:shadow-lg hover:shadow-orange-500/30"
             >
               Book Now
@@ -365,7 +755,7 @@ export default function App() {
 
           <div className="hero-btns flex flex-col sm:flex-row items-center justify-center gap-4 pb-20">
             <button
-              onClick={() => scrollTo("#trips")}
+              onClick={() => openBookingPage()}
               className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-full font-semibold text-base transition-all hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/35"
             >
               Book Your Trip
@@ -586,7 +976,7 @@ export default function App() {
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
                       <div className="display text-2xl font-black text-orange-500">{trip.price}</div>
                       <button
-                        onClick={() => scrollTo("#contact")}
+                        onClick={() => openBookingPage()}
                         className="bg-[#0a1f3c] hover:bg-orange-500 text-white text-[11px] font-bold px-4 py-2 rounded-full transition-all hover:shadow-lg hover:shadow-orange-500/25"
                       >
                         Book Now
