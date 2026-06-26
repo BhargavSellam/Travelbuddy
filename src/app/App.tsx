@@ -262,15 +262,10 @@ export default function App() {
           from { opacity: 0; transform: translateY(-12px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes bounceDot {
-          0%, 100% { transform: translateY(0); }
-          50%       { transform: translateY(8px); }
-        }
         .hero-badge  { animation: heroBadge  0.7s ease 0.1s both; }
         .hero-h1     { animation: heroFadeUp 0.8s ease 0.25s both; }
         .hero-sub    { animation: heroFadeUp 0.8s ease 0.4s  both; }
         .hero-btns   { animation: heroFadeUp 0.8s ease 0.55s both; }
-        .scroll-dot  { animation: bounceDot 1.6s ease-in-out infinite; }
         .display     { font-family: "Outfit", sans-serif; }
       `}</style>
 
@@ -382,13 +377,6 @@ export default function App() {
             >
               Contact Us
             </button>
-          </div>
-        </div>
-
-        {/* Scroll cue */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2">
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center pt-2">
-            <div className="w-1.5 h-2.5 bg-white/50 rounded-full scroll-dot" />
           </div>
         </div>
       </section>
